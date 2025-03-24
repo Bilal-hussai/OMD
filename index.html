@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editable Order Management Dashboard</title>
+    <!-- Import Open Sans from Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Add jsPDF CDN with defer -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Add Font Awesome for search icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: #f0f2f5;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        body.loaded {
+            opacity: 1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            flex: 1;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            position: relative;
+            opacity: 0;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        .search-bar {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 12px 20px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            width: 350px;
+            position: relative;
+            opacity: 0;
+        }
+
+        .search-bar:hover, .search-bar:focus-within {
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .search-bar i {
+            color: #666;
+            font-size: 16px;
+            margin-right: 10px;
+            transition: color 0.3s ease;
+        }
+
+        .search-bar input {
+            border: none;
+            outline: none;
+            font-size: 16px;
+            background: transparent;
+            color: #333;
+            width: 100%;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        .search-bar input::placeholder {
+            color: #999;
+            font-style: italic;
+            transition: color 0.3s ease;
+        }
+
+        .search-bar input:focus::placeholder {
+            color: #ccc;
+        }
+
+        .search-bar:focus-within i {
+            color: #333;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .order-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+            position: relative;
+            opacity: 0;
+        }
+
+        .order-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            background: #ffdcc7;
+        }
+
+        .order-card h3 {
+            font-size: 22px;
+            margin-bottom: 12px;
+        }
+
+        .order-card p {
+            font-size: 16px;
+            color: #666;
+            margin: 6px 0;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 25px;
+            font-size: 14px;
+            margin-top: 12px;
+        }
+
+        .status.pending {
+            background: #ffeaa7;
+            color: #d63031;
+        }
+
+        .status.shipped {
+            background: #00b894;
+            color: white;
+        }
+
+        .status.delivered {
+            background: #6c5ce7;
+            color: white;
+        }
+
+        .edit-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            padding: 6px 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            font-size: 14px;
+        }
+
+        .edit-btn:hover {
+            background: #218838;
+        }
+
+        .select-checkbox {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+        }
+
+        .select-checkbox:checked {
+            accent-color: #d63031; /* Matches Delete Selected button color */
+        }
+
+        .footer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background: #f0f2f5;
+            opacity: 0;
+        }
+
+        .add-order-btn, .export-btn, .delete-btn {
+            padding: 12px 25px;
+            background: #1d1238;
+            color: #edd5b8;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: color 0.3s ease;
+            font-size: 16px;
+            width: 100%;
+            max-width: 250px;
+            margin: 10px 0;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .add-order-btn::before, .delete-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 100%;
+            background: #edd5b8;
+            transition: width 0.4s ease;
+            z-index: -1;
+        }
+
+        .add-order-btn:hover::before, .delete-btn:hover::before {
+            width: 100%;
+        }
+
+        .add-order-btn:hover, .export-btn:hover, .delete-btn:hover {
+            color: #1d1238;
+        }
+
+        .export-btn {
+            display: none;
+        }
+
+        .delete-btn {
+            background: #d63031;
+            padding: 8px 16px; /* Further reduced size */
+            font-size: 13px;  /* Further reduced font size */
+        }
+
+        .delete-btn:hover {
+            color: #fff;
+        }
+
+        .footer-text {
+            margin-top: 25px;
+            font-size: 16px;
+            color: #666;
+            text-align: center;
+        }
+
+        /* Progress Bar Styling */
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease-in-out;
+        }
+
+        .progress-bar.pending {
+            width: 33%;
+            background: #f1c40f; /* Yellow for Pending */
+        }
+
+        .progress-bar.shipped {
+            width: 66%;
+            background: #00b894; /* Green for Shipped */
+        }
+
+        .progress-bar.delivered {
+            width: 100%;
+            background: #6c5ce7; /* Purple for Delivered */
+        }
+
+        /* Animation Keyframes */
+        @keyframes fadeSlideUp {
+            0% {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Animation Classes */
+        .animate-header {
+            animation: fadeSlideUp 0.6s ease-out forwards;
+        }
+
+        .animate-search {
+            animation: fadeSlideUp 0.6s ease-out 0.2s forwards;
+        }
+
+        .animate-card {
+            animation: fadeSlideUp 0.6s ease-out forwards;
+        }
+
+        .animate-footer {
+            animation: fadeSlideUp 0.6s ease-out 0.8s forwards;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-content h2 {
+            margin-bottom: 12px;
+            font-size: 20px;
+        }
+
+        .modal-content label {
+            display: block;
+            margin: 5px 0 2px;
+            font-size: 14px;
+        }
+
+        .modal-content input, .modal-content select {
+            width: 100%;
+            padding: 6px;
+            margin-bottom: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .modal-content input[type="date"] {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .modal-content input:focus, .modal-content select:focus {
+            outline: none;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+            border: 1px solid #ddd;
+        }
+
+        .modal-content .status-field {
+            margin-bottom: 15px;
+        }
+
+        .modal-content .save-btn, .modal-content .add-btn {
+            padding: 8px 15px;
+            background: #000;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .download-btn {
+            padding: 6px 12px;
+            background: #ff0000;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background: #cc0000;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 15px auto;
+                padding: 15px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+                margin-bottom: 15px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .search-bar {
+                width: 100%;
+                padding: 10px 18px;
+            }
+
+            .search-bar i {
+                font-size: 14px;
+                margin-right: 8px;
+            }
+
+            .search-bar input {
+                font-size: 14px;
+            }
+
+            .dashboard {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .order-card {
+                padding: 20px;
+            }
+
+            .order-card h3 {
+                font-size: 20px;
+                margin-bottom: 10px;
+            }
+
+            .order-card p {
+                font-size: 14px;
+                margin: 5px 0;
+            }
+
+            .status {
+                padding: 5px 10px;
+                font-size: 12px;
+                margin-top: 10px;
+            }
+
+            .edit-btn {
+                top: 10px;
+                right: 10px;
+                padding: 5px 10px;
+                font-size: 13px;
+            }
+
+            .footer {
+                padding: 15px;
+            }
+
+            .add-order-btn, .export-btn, .delete-btn {
+                padding: 10px 20px;
+                font-size: 14px;
+                max-width: 220px;
+            }
+
+            .footer-text {
+                margin-top: 20px;
+                font-size: 14px;
+            }
+
+            .modal-content {
+                max-width: 90%;
+                padding: 12px;
+            }
+
+            .modal-content h2 {
+                font-size: 18px;
+                margin-bottom: 10px;
+            }
+
+            .modal-content label {
+                font-size: 12px;
+                margin: 4px 0 1px;
+            }
+
+            .modal-content input, .modal-content select {
+                padding: 5px;
+                font-size: 12px;
+                margin-bottom: 6px;
+            }
+
+            .modal-content .status-field {
+                margin-bottom: 12px;
+            }
+
+            .modal-content .save-btn, .modal-content .add-btn {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .search-bar {
+                padding: 8px 15px;
+            }
+
+            .search-bar i {
+                font-size: 12px;
+                margin-right: 6px;
+            }
+
+            .search-bar input {
+                font-size: 12px;
+            }
+
+            .order-card {
+                padding: 15px;
+            }
+
+            .order-card h3 {
+                font-size: 18px;
+            }
+
+            .order-card p {
+                font-size: 12px;
+            }
+
+            .status {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+
+            .edit-btn {
+                padding: 4px 8px;
+                font-size: 12px;
+            }
+
+            .add-order-btn, .export-btn, .delete-btn {
+                padding: 8px 15px;
+                font-size: 12px;
+                max-width: 200px;
+            }
+
+            .footer-text {
+                font-size: 12px;
+            }
+
+            .modal-content {
+                max-width: 85%;
+                padding: 10px;
+            }
+
+            .modal-content h2 {
+                font-size: 16px;
+                margin-bottom: 8px;
+            }
+
+            .modal-content label {
+                font-size: 11px;
+            }
+
+            .modal-content input, .modal-content select {
+                padding: 4px;
+                font-size: 11px;
+                margin-bottom: 5px;
+            }
+
+            .modal-content .save-btn, .modal-content .add-btn {
+                padding: 5px 10px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Order Management Dashboard</h1>
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Search orders..." onkeyup="searchOrders()">
+            </div>
+        </div>
+
+        <div class="dashboard" id="dashboard">
+            <!-- Order cards will be populated dynamically -->
+        </div>
+    </div>
+
+    <!-- Footer with Add New Order, Delete, and hidden Export Buttons -->
+    <div class="footer">
+        <button class="add-order-btn" onclick="openAddModal()">Add New Order</button>
+        <button class="delete-btn" onclick="deleteSelectedOrders()">Delete Selected</button>
+        <button class="export-btn" onclick="exportUpdatedCode()">Export Updated Code</button>
+        <div class="footer-text">Developed by Bilal-Hussain ©2025</div>
+    </div>
+
+    <!-- Edit Modal with Download Button -->
+    <div class="modal" id="editModal">
+        <div class="modal-content" style="max-width: 300px; padding: 10px;">
+            <div class="modal-header">
+                <h2 style="font-size: 18px; margin-bottom: 0;">Edit Order</h2>
+                <button class="download-btn" onclick="downloadOrder()">Download Doc</button>
+            </div>
+            <form id="editForm">
+                <label for="editOrderId" style="font-size: 12px; margin: 3px 0 1px;">Order ID</label>
+                <input type="text" id="editOrderId" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+
+                <label for="editCustomer" style="font-size: 12px; margin: 3px 0 1px;">Customer</label>
+                <input type="text" id="editCustomer" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+
+                <label for="editAddress" style="font-size: 12px; margin: 3px 0 1px;">Address</label>
+                <input type="text" id="editAddress" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+
+                <label for="editPhoneNumber" style="font-size: 12px; margin: 3px 0 1px;">Phone Number</label>
+                <input type="text" id="editPhoneNumber" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+
+                <label for="editWhatsAppNumber" style="font-size: 12px; margin: 3px 0 1px;">WhatsApp Number</label>
+                <input type="text" id="editWhatsAppNumber" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+
+                <label for="editEmail" style="font-size: 12px; margin: 3px 0 1px;">Email</label>
+                <input type="email" id="editEmail" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+
+                <label for="editProduct" style="font-size: 12px; margin: 3px 0 1px;">Product</label>
+                <input type="text" id="editProduct" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+
+                <label for="editDate" style="font-size: 12px; margin: 3px 0 1px;">Date</label>
+                <input type="date" id="editDate" onchange="formatDate(this, 'editDateDisplay')" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+                <input type="hidden" id="editDateDisplay">
+
+                <label for="editCost" style="font-size: 12px; margin: 3px 0 1px;">Cost</label>
+                <input type="text" id="editCost" oninput="formatCurrency(this)" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+
+                <label for="editShippingCost" style="font-size: 12px; margin: 3px 0 1px;">Shipping Cost</label>
+                <input type="text" id="editShippingCost" oninput="formatCurrency(this)" style="padding: 4px; font-size: 12px; margin-bottom: 6px;">
+
+                <label for="editStatus" style="font-size: 12px; margin: 3px 0 1px;">Status</label>
+                <div class="status-field" style="margin-bottom: 10px;">
+                    <select id="editStatus" style="padding: 4px; font-size: 12px;">
+                        <option value="pending">Pending</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                    </select>
+                </div>
+
+                <button type="button" class="save-btn" onclick="saveChanges()" style="padding: 6px 10px; font-size: 12px;">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add New Order Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <h2>Add New Order</h2>
+            <form id="addForm">
+                <label for="addOrderId">Order ID</label>
+                <input type="text" id="addOrderId" required>
+
+                <label for="addCustomer">Customer</label>
+                <input type="text" id="addCustomer" required>
+
+                <label for="addAddress">Address</label>
+                <input type="text" id="addAddress" required>
+
+                <label for="addPhoneNumber">Phone Number</label>
+                <input type="text" id="addPhoneNumber" required>
+
+                <label for="addWhatsAppNumber">WhatsApp Number</label>
+                <input type="text" id="addWhatsAppNumber" required>
+
+                <label for="addEmail">Email</label>
+                <input type="email" id="addEmail" required>
+
+                <label for="addProduct">Product</label>
+                <input type="text" id="addProduct" required>
+
+                <label for="addDate">Date</label>
+                <input type="date" id="addDate" onchange="formatDate(this, 'addDateDisplay')" required>
+                <input type="hidden" id="addDateDisplay">
+
+                <label for="addCost">Cost</label>
+                <input type="text" id="addCost" oninput="formatCurrency(this)" required>
+
+                <label for="addShippingCost">Shipping Cost</label>
+                <input type="text" id="addShippingCost" oninput="formatCurrency(this)" required>
+
+                <label for="addStatus">Status</label>
+                <div class="status-field">
+                    <select id="addStatus" required>
+                        <option value="pending">Pending</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                    </select>
+                </div>
+
+                <button type="button" class="add-btn" onclick="addNewOrder()">Add Order</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Initial orders data hardcoded in the code
+        const initialOrders = [
+            {
+                orderId: "12345",
+                customer: "Ali Khan",
+                address: "123 Main St, Karachi, Pakistan",
+                phoneNumber: "+92 300 1234567",
+                whatsappNumber: "+92 300 1234567",
+                email: "ali.khan@example.com",
+                product: "Custom T-Shirt",
+                date: "20th March 2025",
+                cost: "$20.00",
+                shippingCost: "$5.99",
+                status: "pending"
+            },
+            {
+                orderId: "12346",
+                customer: "Sara Ahmed",
+                address: "456 Gulshan, Lahore, Pakistan",
+                phoneNumber: "+92 321 9876543",
+                whatsappNumber: "+92 321 9876543",
+                email: "sara.ahmed@example.com",
+                product: "Coffee Mug",
+                date: "21st March 2025",
+                cost: "$10.00",
+                shippingCost: "$5.50",
+                status: "shipped"
+            },
+            {
+                orderId: "12347",
+                customer: "Usman Malik",
+                address: "789 Clifton, Karachi, Pakistan",
+                phoneNumber: "+92 333 4567890",
+                whatsappNumber: "+92 333 4567890",
+                email: "usman.malik@example.com",
+                product: "Hoodie",
+                date: "22nd March 2025",
+                cost: "$35.00",
+                shippingCost: "$10.00",
+                status: "delivered"
+            }
+        ];
+
+        // Load orders from localStorage or use initial data
+        function loadOrders() {
+            const savedOrders = JSON.parse(localStorage.getItem('orders')) || initialOrders;
+            const dashboard = document.getElementById('dashboard');
+            dashboard.innerHTML = ''; // Clear existing cards
+
+            savedOrders.forEach((order, index) => {
+                const card = document.createElement('div');
+                card.className = 'order-card';
+                card.dataset.id = order.orderId;
+                card.innerHTML = `
+                    <input type="checkbox" class="select-checkbox" data-id="${order.orderId}">
+                    <h3 class="order-id">Order #${order.orderId}</h3>
+                    <p><strong>Customer:</strong> <span class="customer">${order.customer}</span></p>
+                    <p><strong>Address:</strong> <span class="address">${order.address}</span></p>
+                    <p><strong>Phone Number:</strong> <span class="phone-number">${order.phoneNumber}</span></p>
+                    <p><strong>WhatsApp Number:</strong> <span class="whatsapp-number">${order.whatsappNumber}</span></p>
+                    <p><strong>Email:</strong> <span class="email">${order.email}</span></p>
+                    <p><strong>Product:</strong> <span class="product">${order.product}</span></p>
+                    <p><strong>Date:</strong> <span class="date">${order.date}</span></p>
+                    <p><strong>Cost:</strong> <span class="cost">${order.cost}</span></p>
+                    <p><strong>Shipping Cost:</strong> <span class="shipping-cost">${order.shippingCost}</span></p>
+                    <span class="status ${order.status}">${order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
+                    <div class="progress-container">
+                        <div class="progress-bar ${order.status}"></div>
+                    </div>
+                    <button class="edit-btn" data-order-id="${order.orderId}">Edit</button>
+                `;
+                dashboard.appendChild(card);
+
+                // Add animation with dynamic delay for each card
+                setTimeout(() => {
+                    card.classList.add('animate-card');
+                    card.style.animationDelay = `${0.4 + index * 0.2}s`;
+                }, 0);
+            });
+        }
+
+        // Save orders to localStorage
+        function saveOrdersToLocalStorage() {
+            const orders = [];
+            document.querySelectorAll('.order-card').forEach(card => {
+                const order = {
+                    orderId: card.dataset.id,
+                    customer: card.querySelector('.customer').textContent,
+                    address: card.querySelector('.address').textContent,
+                    phoneNumber: card.querySelector('.phone-number').textContent,
+                    whatsappNumber: card.querySelector('.whatsapp-number').textContent,
+                    email: card.querySelector('.email').textContent,
+                    product: card.querySelector('.product').textContent,
+                    date: card.querySelector('.date').textContent,
+                    cost: card.querySelector('.cost').textContent,
+                    shippingCost: card.querySelector('.shipping-cost').textContent,
+                    status: card.querySelector('.status').classList[1]
+                };
+                orders.push(order);
+            });
+            localStorage.setItem('orders', JSON.stringify(orders));
+        }
+
+        // Delete selected orders
+        function deleteSelectedOrders() {
+            const selectedCheckboxes = document.querySelectorAll('.select-checkbox:checked');
+            if (selectedCheckboxes.length === 0) {
+                alert('Please select at least one order to delete.');
+                return;
+            }
+
+            if (confirm(`Are you sure you want to delete ${selectedCheckboxes.length} order(s)?`)) {
+                selectedCheckboxes.forEach(checkbox => {
+                    const card = checkbox.closest('.order-card');
+                    card.remove();
+                });
+                saveOrdersToLocalStorage(); // Update localStorage after deletion
+            }
+        }
+
+        // Export updated code for manual update (hidden but functional)
+        function exportUpdatedCode() {
+            const orders = [];
+            document.querySelectorAll('.order-card').forEach(card => {
+                const order = {
+                    orderId: card.dataset.id,
+                    customer: card.querySelector('.customer').textContent,
+                    address: card.querySelector('.address').textContent,
+                    phoneNumber: card.querySelector('.phone-number').textContent,
+                    whatsappNumber: card.querySelector('.whatsapp-number').textContent,
+                    email: card.querySelector('.email').textContent,
+                    product: card.querySelector('.product').textContent,
+                    date: card.querySelector('.date').textContent,
+                    cost: card.querySelector('.cost').textContent,
+                    shippingCost: card.querySelector('.shipping-cost').textContent,
+                    status: card.querySelector('.status').classList[1]
+                };
+                orders.push(order);
+            });
+
+            const updatedOrdersString = JSON.stringify(orders, null, 4);
+            const updatedCode = `
+                // Initial orders data hardcoded in the code
+                const initialOrders = ${updatedOrdersString};
+            `;
+            prompt("Copy this code and replace the initialOrders section in your HTML file:", updatedCode);
+        }
+
+        function formatDate(input, displayId) {
+            const date = new Date(input.value);
+            if (!isNaN(date)) {
+                const day = date.getDate();
+                const month = date.toLocaleString('default', { month: 'long' });
+                const year = date.getFullYear();
+                const suffix = getDaySuffix(day);
+                const formattedDate = `${day}${suffix} ${month} ${year}`;
+                document.getElementById(displayId).value = formattedDate;
+            }
+        }
+
+        function getDaySuffix(day) {
+            if (day >= 11 && day <= 13) return "th";
+            switch (day % 10) {
+                case 1: return "st";
+                case 2: return "nd";
+                case 3: return "rd";
+                default: return "th";
+            }
+        }
+
+        function parseFormattedDate(formattedDate) {
+            const parts = formattedDate.match(/(\d+)(?:st|nd|rd|th)\s(\w+)\s(\d+)/);
+            if (!parts) return null;
+
+            const day = parseInt(parts[1], 10);
+            const monthName = parts[2];
+            const year = parseInt(parts[3], 10);
+
+            const monthNames = ["January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"];
+            const month = monthNames.indexOf(monthName);
+            if (month === -1) return null;
+
+            const date = new Date(year, month, day);
+            if (isNaN(date)) return null;
+
+            const formattedMonth = (month + 1).toString().padStart(2, '0');
+            const formattedDay = day.toString().padStart(2, '0');
+            return `${year}-${formattedMonth}-${formattedDay}`;
+        }
+
+        function formatCurrency(input) {
+            let value = input.value.replace(/[^0-9.]/g, '');
+            if (value === '') {
+                input.value = '$0.00';
+                return;
+            }
+
+            let parts = value.split('.');
+            let integerPart = parts[0];
+            let decimalPart = parts[1] || '00';
+
+            if (decimalPart.length > 2) decimalPart = decimalPart.substring(0, 2);
+            else if (decimalPart.length < 2) decimalPart = decimalPart.padEnd(2, '0');
+
+            input.value = `$${integerPart}.${decimalPart}`;
+        }
+
+        function openEditModal(orderId) {
+            const card = document.querySelector(`.order-card[data-id="${orderId}"]`);
+            const modal = document.getElementById('editModal');
+
+            document.getElementById('editOrderId').value = orderId;
+            document.getElementById('editCustomer').value = card.querySelector('.customer').textContent;
+            document.getElementById('editAddress').value = card.querySelector('.address').textContent;
+            document.getElementById('editPhoneNumber').value = card.querySelector('.phone-number').textContent;
+            document.getElementById('editWhatsAppNumber').value = card.querySelector('.whatsapp-number').textContent;
+            document.getElementById('editEmail').value = card.querySelector('.email').textContent;
+            document.getElementById('editProduct').value = card.querySelector('.product').textContent;
+
+            const formattedDate = card.querySelector('.date').textContent;
+            const parsedDate = parseFormattedDate(formattedDate);
+            document.getElementById('editDate').value = parsedDate || '';
+            document.getElementById('editDateDisplay').value = formattedDate;
+
+            document.getElementById('editCost').value = card.querySelector('.cost').textContent;
+            document.getElementById('editShippingCost').value = card.querySelector('.shipping-cost').textContent;
+            document.getElementById('editStatus').value = card.querySelector('.status').classList[1];
+
+            modal.dataset.currentOrderId = orderId;
+            modal.style.display = 'flex';
+        }
+
+        function saveChanges() {
+            const originalOrderId = document.querySelector('#editModal').dataset.currentOrderId;
+            const newOrderId = document.getElementById('editOrderId').value;
+            const card = document.querySelector(`.order-card[data-id="${originalOrderId}"]`);
+
+            if (card) {
+                card.dataset.id = newOrderId;
+                card.querySelector('.order-id').textContent = `Order #${newOrderId}`;
+                card.querySelector('.customer').textContent = document.getElementById('editCustomer').value;
+                card.querySelector('.address').textContent = document.getElementById('editAddress').value;
+                card.querySelector('.phone-number').textContent = document.getElementById('editPhoneNumber').value;
+                card.querySelector('.whatsapp-number').textContent = document.getElementById('editWhatsAppNumber').value;
+                card.querySelector('.email').textContent = document.getElementById('editEmail').value;
+                card.querySelector('.product').textContent = document.getElementById('editProduct').value;
+                card.querySelector('.date').textContent = document.getElementById('editDateDisplay').value;
+                card.querySelector('.cost').textContent = document.getElementById('editCost').value;
+                card.querySelector('.shipping-cost').textContent = document.getElementById('editShippingCost').value;
+
+                const newStatus = document.getElementById('editStatus').value;
+                const statusElement = card.querySelector('.status');
+                statusElement.className = `status ${newStatus}`;
+                statusElement.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+
+                // Update progress bar
+                const progressBar = card.querySelector('.progress-bar');
+                progressBar.className = `progress-bar ${newStatus}`;
+
+                card.querySelector('.edit-btn').dataset.orderId = newOrderId;
+                card.querySelector('.select-checkbox').dataset.id = newOrderId; // Update checkbox data-id
+
+                saveOrdersToLocalStorage();
+                document.getElementById('editModal').style.display = 'none';
+            } else {
+                console.error('Card not found for order ID:', originalOrderId);
+            }
+        }
+
+        function openAddModal() {
+            const modal = document.getElementById('addModal');
+            modal.style.display = 'flex';
+            document.getElementById('addCost').value = '$0.00';
+            document.getElementById('addShippingCost').value = '$0.00';
+        }
+
+        function addNewOrder() {
+            const orderId = document.getElementById('addOrderId').value;
+            const customer = document.getElementById('addCustomer').value;
+            const address = document.getElementById('addAddress').value;
+            const phoneNumber = document.getElementById('addPhoneNumber').value;
+            const whatsappNumber = document.getElementById('addWhatsAppNumber').value;
+            const email = document.getElementById('addEmail').value;
+            const product = document.getElementById('addProduct').value;
+            const date = document.getElementById('addDateDisplay').value;
+            const cost = document.getElementById('addCost').value;
+            const shippingCost = document.getElementById('addShippingCost').value;
+            const status = document.getElementById('addStatus').value;
+
+            if (!orderId || !customer || !address || !phoneNumber || !whatsappNumber || !email || !product || !date || !cost || !shippingCost || !status) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            const dashboard = document.getElementById('dashboard');
+            const newCard = document.createElement('div');
+            newCard.className = 'order-card';
+            newCard.dataset.id = orderId;
+            newCard.innerHTML = `
+                <input type="checkbox" class="select-checkbox" data-id="${orderId}">
+                <h3 class="order-id">Order #${orderId}</h3>
+                <p><strong>Customer:</strong> <span class="customer">${customer}</span></p>
+                <p><strong>Address:</strong> <span class="address">${address}</span></p>
+                <p><strong>Phone Number:</strong> <span class="phone-number">${phoneNumber}</span></p>
+                <p><strong>WhatsApp Number:</strong> <span class="whatsapp-number">${whatsappNumber}</span></p>
+                <p><strong>Email:</strong> <span class="email">${email}</span></p>
+                <p><strong>Product:</strong> <span class="product">${product}</span></p>
+                <p><strong>Date:</strong> <span class="date">${date}</span></p>
+                <p><strong>Cost:</strong> <span class="cost">${cost}</span></p>
+                <p><strong>Shipping Cost:</strong> <span class="shipping-cost">${shippingCost}</span></p>
+                <span class="status ${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span>
+                <div class="progress-container">
+                    <div class="progress-bar ${status}"></div>
+                </div>
+                <button class="edit-btn" data-order-id="${orderId}">Edit</button>
+            `;
+
+            dashboard.appendChild(newCard);
+            saveOrdersToLocalStorage();
+            document.getElementById('addModal').style.display = 'none';
+            document.getElementById('addForm').reset();
+
+            // Add animation to the new card immediately
+            setTimeout(() => {
+                newCard.classList.add('animate-card');
+            }, 0);
+        }
+
+        function searchOrders() {
+            const searchInput = document.getElementById('searchInput').value.toLowerCase();
+            const orderCards = document.querySelectorAll('.order-card');
+
+            orderCards.forEach(card => {
+                const orderId = card.querySelector('.order-id').textContent.toLowerCase();
+                const customer = card.querySelector('.customer').textContent.toLowerCase();
+                const address = card.querySelector('.address').textContent.toLowerCase();
+                const phoneNumber = card.querySelector('.phone-number').textContent.toLowerCase();
+                const whatsappNumber = card.querySelector('.whatsapp-number').textContent.toLowerCase();
+                const email = card.querySelector('.email').textContent.toLowerCase();
+                const product = card.querySelector('.product').textContent.toLowerCase();
+                const date = card.querySelector('.date').textContent.toLowerCase();
+                const cost = card.querySelector('.cost').textContent.toLowerCase();
+                const shippingCost = card.querySelector('.shipping-cost').textContent.toLowerCase();
+                const status = card.querySelector('.status').textContent.toLowerCase();
+
+                if (
+                    orderId.includes(searchInput) ||
+                    customer.includes(searchInput) ||
+                    address.includes(searchInput) ||
+                    phoneNumber.includes(searchInput) ||
+                    whatsappNumber.includes(searchInput) ||
+                    email.includes(searchInput) ||
+                    product.includes(searchInput) ||
+                    date.includes(searchInput) ||
+                    cost.includes(searchInput) ||
+                    shippingCost.includes(searchInput) ||
+                    status.includes(searchInput)
+                ) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+        }
+
+        // Handle page load and trigger animations
+        window.addEventListener('load', function() {
+            // Add loaded class to body for initial fade-in
+            document.body.classList.add('loaded');
+
+            // Load orders first
+            loadOrders();
+
+            // Trigger animations for static elements
+            document.querySelector('.header').classList.add('animate-header');
+            document.querySelector('.search-bar').classList.add('animate-search');
+            document.querySelector('.footer').classList.add('animate-footer');
+
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                console.error('jsPDF is not loaded properly.');
+                alert('Error: jsPDF library failed to load. Please check your internet connection or try again later.');
+            }
+
+            // Dynamically add event listeners to edit buttons
+            document.querySelectorAll('.edit-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const orderId = this.dataset.orderId;
+                    openEditModal(orderId);
+                });
+            });
+
+            // Define downloadOrder function
+            window.downloadOrder = function() {
+                if (!window.jspdf || !window.jspdf.jsPDF) {
+                    alert('jsPDF is not available. Cannot download.');
+                    return;
+                }
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                const orderId = document.getElementById('editOrderId').value;
+                const customer = document.getElementById('editCustomer').value;
+                const address = document.getElementById('editAddress').value;
+                const phoneNumber = document.getElementById('editPhoneNumber').value;
+                const whatsappNumber = document.getElementById('editWhatsAppNumber').value;
+                const email = document.getElementById('editEmail').value;
+                const product = document.getElementById('editProduct').value;
+                const date = document.getElementById('editDateDisplay').value;
+                const cost = document.getElementById('editCost').value;
+                const shippingCost = document.getElementById('editShippingCost').value;
+                const status = document.getElementById('editStatus').value;
+
+                let y = 10;
+                doc.setFontSize(16);
+                doc.text("Order Details", 10, y);
+                y += 10;
+
+                doc.setFontSize(12);
+                doc.text(`Order ID: ${orderId}`, 10, y); y += 10;
+                doc.text(`Customer: ${customer}`, 10, y); y += 10;
+                doc.text(`Address: ${address}`, 10, y); y += 10;
+                doc.text(`Phone Number: ${phoneNumber}`, 10, y); y += 10;
+                doc.text(`WhatsApp Number: ${whatsappNumber}`, 10, y); y += 10;
+                doc.text(`Email: ${email}`, 10, y); y += 10;
+                doc.text(`Product: ${product}`, 10, y); y += 10;
+                doc.text(`Date: ${date}`, 10, y); y += 10;
+                doc.text(`Cost: ${cost}`, 10, y); y += 10;
+                doc.text(`Shipping Cost: ${shippingCost}`, 10, y); y += 10;
+                doc.text(`Status: ${status.charAt(0).toUpperCase() + status.slice(1)}`, 10, y);
+
+                doc.save(`Order_${orderId}.pdf`);
+            };
+        });
+
+        // Modal close event listeners
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) this.style.display = 'none';
+        });
+
+        document.getElementById('addModal').addEventListener('click', function(e) {
+            if (e.target === this) this.style.display = 'none';
+        });
+    </script>
+</body>
+</html>
